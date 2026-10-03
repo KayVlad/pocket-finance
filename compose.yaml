@@ -1,0 +1,14 @@
+services:
+  pocket-finance:
+    build: .
+    image: pocket-finance:local
+    init: true
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - pocket-data:/app/.wrangler/state
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+volumes:
+  pocket-data:
