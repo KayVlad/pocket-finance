@@ -13,7 +13,7 @@ const admin=client(),a=client(),b=client(),anon=client();
 try{
  sql(`INSERT INTO accounts (id,name,token_hash,created_at,username,password_hash,role) VALUES ('${adminId}','Disposable QA admin','${randomUUID()}',0,'qa_admin_${suffix}','${await bcrypt.hash(password,12)}','admin');`);
  assert.equal((await admin.request('/api/account','POST',{username:'qa_admin_'+suffix,password})).status,200);
- for(const [label,c] of [['a',a],['b',b]]){const r=await admin.request('/api/users','POST',{name:'QA '+label,username:'qa_'+label+'_'+suffix,password,role:'admin'});assert.equal(r.status,201);assert.equal(r.data.user.role,'user');ids.push(r.data.user.id);assert.equal((await c.request('/api/account','POST',{username:'qa_'+label+'_'+suffix,password})).status,200);}
+ for(const [label,c] of [['a',a],['b',b]]){const r=await admin.request('/api/users','POST',{name:'QA '+label,username:'qa_'+label+'_'+suffix,password,role:'user'});assert.equal(r.status,201);assert.equal(r.data.user.role,'user');ids.push(r.data.user.id);assert.equal((await c.request('/api/account','POST',{username:'qa_'+label+'_'+suffix,password})).status,200);}
  assert.equal((await anon.request('/api/users')).status,401);assert.equal((await a.request('/api/users')).status,403);
  assert.equal((await anon.request('/api/account','POST',{action:'create',name:'Public'})).status,400);
  const cats=async(c,y)=>(await c.request('/api/categories?year='+y)).data.categories;

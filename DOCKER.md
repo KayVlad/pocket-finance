@@ -13,15 +13,9 @@ docker compose logs -f pocket-finance
 ```
 
 Startup applies pending local database migrations before starting the server.
-On a fresh installation, create the first administrator after the server starts:
+On a fresh installation, open http://localhost:8787 and create the first admin in the setup screen. Once setup completes, admins use Users to create users and other admins, change roles, reset passwords, disable access and delete accounts. Everyone can change their own password in Settings.
 
-```sh
-docker compose exec pocket-finance npm run admin:create -- --username admin --name Admin
-```
-
-The command prints a generated password. Save it and sign in with it. It refuses
-to create another administrator when one already exists. Create further users
-through the app's Users button.
+For offline provisioning, `docker compose exec pocket-finance npm run admin:create -- --username admin --name Admin` remains available before setup. It prints a generated password and refuses to bootstrap another administrator once one exists.
 
 ## Build and run without Compose
 
@@ -32,7 +26,6 @@ docker run -d --name pocket-finance --init \
   -p 127.0.0.1:8787:8787 \
   -v pocket-finance-data:/app/.wrangler/state \
   pocket-finance:local
-docker exec pocket-finance npm run admin:create -- --username admin --name Admin
 ```
 
 ## Stop, update, and export

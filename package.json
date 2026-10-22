@@ -15,7 +15,8 @@
     "db:setup": "node scripts/setup-local.mjs",
     "admin:create": "node scripts/local-admin.mjs --local",
     "typecheck": "tsc --noEmit",
-    "test:integration": "node scripts/test-finance.mjs"
+    "test:integration": "node scripts/test-finance.mjs",
+    "test:accounts": "node scripts/test-accounts.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

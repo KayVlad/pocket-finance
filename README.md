@@ -12,7 +12,7 @@ A personal finance web app with the familiar rows and columns of a budget spread
 - Optional descriptions (default: `Transaction`), notes, full-refund and emergency-fund checkboxes.
 - Receipt photos on new and existing transactions, with downloads beside Edit and a distinct tint for entries that have receipts.
 - CSV export and a complete JSON backup/restore, including yearly categories, preferences and receipt photos.
-- Username/password login with separate data for every account. No public registration; an admin creates users, resets passwords and disables access.
+- Username/password login with separate data for every account. First-run setup creates the initial admin. Admins create users and other admins, change roles, reset passwords, disable access and delete accounts. Everyone can change their own password in Settings.
 
 ## Run locally
 
@@ -23,11 +23,14 @@ git clone https://github.com/KayVlad/pocket-finance.git
 cd pocket-finance
 npm ci
 npm run db:setup
-npm run admin:create -- --username admin --name Admin
 npm run dev
 ```
 
-Open **http://localhost:5173**. The admin command prints a randomly generated password in your terminal. Save it and sign in with the username you supplied. You can change your password in Settings and create ordinary users from the admin's Users screen. There are no default credentials or preloaded personal records.
+Open **http://localhost:5173**. On a fresh installation, Pocket asks you to create the first admin with your name, username and password. Setup signs you in and closes permanently once an account is configured. Existing installations keep their accounts and show the sign-in form. There are no default credentials or preloaded personal records.
+
+Admins use **Users** to create users or admins, promote or demote accounts, reset passwords, disable access and permanently delete accounts. Deleting an account removes its finance data and receipt photos. Admins cannot delete or disable themselves or change their own role, which also protects the final active admin during concurrent changes. Admin privileges cover account management; finance data remains scoped to each account.
+
+Everyone can change their password in **Settings** using their current password. Password changes sign out other devices; admin resets, role changes and disabling revoke all sessions for the affected account. If you forget your password, ask another admin to reset it. There is no email recovery service.
 
 Keep the development server running while using the app. Stop it with Ctrl+C. For subsequent runs, use `npm run dev`; you do not need to create another admin. `npm run db:setup` also applies new migrations when you update a checkout initialized through this workflow. It does not target a hosted database.
 
@@ -81,15 +84,16 @@ Built with React, TypeScript, Vinext/Vite, Tailwind, Radix components, Drizzle O
 | --- | --- |
 | `npm run dev` | Development server on port 5173 |
 | `npm run db:setup` | Apply migrations to the local D1 database |
-| `npm run admin:create -- --username admin --name Admin` | Create the first local admin |
+| `npm run admin:create -- --username admin --name Admin` | Optional offline first-admin bootstrap |
 | `npm run typecheck` | TypeScript checks |
 | `npm run lint` | ESLint checks |
 | `npm run test:integration` | API integration checks against the running local server |
+| `npm run test:accounts` | Setup, permissions and account lifecycle checks in an isolated temporary database |
 | `npm run db:generate` | Generate a migration after changing the schema |
 | `npm run build` | Create a production build in `dist` |
 | `npm start` | Run that build locally, normally on port 8787 |
 
-Integration checks create and clean up their own disposable local accounts. They cover authentication, account isolation, transaction and category operations, yearly inheritance, refunds, fund calculations, forward-fill replacement, receipts, exports and backup/restore. They do not reset your admin's password. The development server must be running, and the database must be initialized. To test another local port, set `TEST_URL` to `http://localhost:<port>`.
+Integration checks create and clean up their own disposable local accounts. They cover authentication, account isolation, transaction and category operations, yearly inheritance, refunds, fund calculations, forward-fill replacement, receipts, exports and backup/restore. They do not reset your admin's password. `npm run test:accounts` starts its own temporary server and database and checks simultaneous setup, admin/user permissions, role changes, password resets, session revocation, deletion cleanup and concurrent protection of the final admin. It never touches existing accounts. For `test:integration`, the development server must be running, and the database must be initialized. To test another local port, set `TEST_URL` to `http://localhost:<port>`.
 
 Key directories:
 
@@ -105,4 +109,4 @@ build/               Vite integration helpers
 
 Passwords are hashed with bcrypt. Expiring sessions use hashed secrets and HttpOnly cookies, with SameSite protection and Secure cookies over HTTPS. User disabling and password resets revoke existing sessions. The offline admin bootstrap refuses to create another admin once one exists.
 
-`npm start` is a local preview, not a public deployment. Running on a server requires configuring that environment's D1/R2 resources, applying migrations there, provisioning its initial admin through a trusted administrative workflow, and serving over HTTPS. No bank connection, Google Sheets synchronization or public deployment is set up by the local commands.
+`npm start` is a local preview, not a public deployment. Running on a server requires configuring that environment's D1/R2 resources, applying migrations there, completing first-admin setup before giving others access, and serving over HTTPS. No bank connection, Google Sheets synchronization or public deployment is set up by the local commands.

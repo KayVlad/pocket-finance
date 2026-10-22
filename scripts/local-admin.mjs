@@ -1,4 +1,4 @@
-// Offline, local-only bootstrap. No public endpoint can create the first admin.
+// Optional offline, local-only alternative to the first-run setup screen.
 import bcrypt from 'bcryptjs';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {writeFileSync,unlinkSync,existsSync} from 'node:fs';

@@ -1,8 +1,9 @@
 import {accountFor,body,boundary,cookieValue,db,hash,HttpError,json,randomSecret,sameOrigin,sessionCookie,requireAccount} from '@/lib/server';
 import {verifyPassword,validPassword,hashPassword} from '@/lib/password';
 import type {Account} from '@/lib/finance';
+import {setupRequired} from '@/lib/accounts-server';
 export const dynamic='force-dynamic';
-export async function GET(request:Request){return boundary(async()=>json({account:await accountFor(request)}));}
+export async function GET(request:Request){return boundary(async()=>{const account=await accountFor(request);return json({account,setupRequired:account?false:await setupRequired()});});}
 export async function POST(request:Request){return boundary(async()=>{
  sameOrigin(request);const input=await body(request);
  if(!input||typeof input.username!=='string'||typeof input.password!=='string'||(input.action&&input.action!=='login'))throw new HttpError(400,'Enter your username and password.');
@@ -18,10 +19,10 @@ export async function POST(request:Request){return boundary(async()=>{
  const encoded=found?.password_hash||'$2b$12$n9AmZsl0jO4iNddMelxFYuMTP9sK/yDi/QPQxBEADGNx4FuLEaK7a';
  const matches=await verifyPassword(input.password,encoded);
  if(!found?.password_hash||!matches||found.disabled)throw new HttpError(401,'Incorrect username or password.');
- const {password_hash:_,...account}=found;const session=randomSecret(),old=cookieValue(request);
- const statements=[db().prepare('INSERT INTO sessions (hash,account_id,expires_at) VALUES (?,?,?)').bind(await hash(session),account.id,now+2592000000),db().prepare('DELETE FROM login_attempts WHERE key=?').bind(key)];
+ const account:Account={id:found.id,name:found.name,username:found.username,role:found.role,accent:found.accent,disabled:found.disabled};const session=randomSecret(),old=cookieValue(request);
+ const statements=[db().prepare('INSERT INTO sessions (hash,account_id,expires_at) SELECT ?,id,? FROM accounts WHERE id=? AND password_hash=? AND disabled=0').bind(await hash(session),now+2592000000,account.id,encoded),db().prepare('DELETE FROM login_attempts WHERE key=?').bind(key)];
  if(/^[a-f0-9]{64}$/.test(old))statements.push(db().prepare('DELETE FROM sessions WHERE hash=?').bind(await hash(old)));
- await db().batch(statements);return json({account},200,{'Set-Cookie':sessionCookie(request,session)});
+ const results=await db().batch(statements);if(!results[0].meta.changes)throw new HttpError(401,'Incorrect username or password.');return json({account},200,{'Set-Cookie':sessionCookie(request,session)});
 });}
 export async function PATCH(request:Request){return boundary(async()=>{
  sameOrigin(request);const account=await requireAccount(request),input=await body(request);
@@ -33,7 +34,13 @@ export async function PUT(request:Request){return boundary(async()=>{
  if(typeof input?.currentPassword!=='string'||!validPassword(input.password))throw new HttpError(400,'Use a password of at least 12 characters, up to 72 UTF-8 bytes.');
  const found=await db().prepare('SELECT password_hash FROM accounts WHERE id=?').bind(account.id).first<{password_hash:string}>();
  if(!found||!await verifyPassword(input.currentPassword,found.password_hash))throw new HttpError(401,'Current password is incorrect.');
- const session=randomSecret();await db().batch([db().prepare('UPDATE accounts SET password_hash=? WHERE id=?').bind(await hashPassword(input.password),account.id),db().prepare('DELETE FROM sessions WHERE account_id=?').bind(account.id),db().prepare('INSERT INTO sessions (hash,account_id,expires_at) VALUES (?,?,?)').bind(await hash(session),account.id,Date.now()+2592000000)]);
+ const session=randomSecret(),encoded=await hashPassword(input.password);
+ const results=await db().batch([
+  db().prepare('UPDATE accounts SET password_hash=? WHERE id=? AND password_hash=? AND disabled=0').bind(encoded,account.id,found.password_hash),
+  db().prepare('DELETE FROM sessions WHERE account_id=? AND EXISTS (SELECT 1 FROM accounts WHERE id=? AND password_hash=?)').bind(account.id,account.id,encoded),
+  db().prepare('INSERT INTO sessions (hash,account_id,expires_at) SELECT ?,id,? FROM accounts WHERE id=? AND password_hash=? AND disabled=0').bind(await hash(session),Date.now()+2592000000,account.id,encoded),
+ ]);
+ if(!results[0].meta.changes)throw new HttpError(409,'Your account changed. Sign in again before changing your password.');
  return json({ok:true},200,{'Set-Cookie':sessionCookie(request,session)});
 });}
 export async function DELETE(request:Request){return boundary(async()=>{sameOrigin(request);const cookie=cookieValue(request);if(cookie)await db().prepare('DELETE FROM sessions WHERE hash=?').bind(await hash(cookie)).run();return json({ok:true},200,{'Set-Cookie':sessionCookie(request,'',0)});});}
